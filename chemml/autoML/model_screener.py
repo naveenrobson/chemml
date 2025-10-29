@@ -195,10 +195,10 @@ class ModelScreener(object):
             elif model_name == "LogisticRegression":
                 model = getattr(module,model_name)(C=parameters_list[0], fit_intercept=parameters_list[1], solver=parameters_list[2])
 
-            elif model_name == "PyTorchRegressorWrapper":  
+            elif model_name == "PyTorchRegressorWrapper":  # new addition to regression models
                 model = getattr(module,model_name)(input_dim=self.nfeatures, n_layers=parameters_list[0], base_neurons=parameters_list[1], output_dim=1, activation_functions=parameters_list[2], lr=np.exp(parameters_list[3]), alpha=np.exp(parameters_list[4]), epochs=parameters_list[5], optimizer_choice=parameters_list[6], batch_size=parameters_list[7], dropout_rate=parameters_list[8], patience=parameters_list[9])
                 
-            elif model_name == "TensorFlowRegressorWrapper":
+            elif model_name == "TensorFlowRegressorWrapper": # new addition to regression models
                 model = getattr(module,model_name)(input_dim=self.nfeatures, n_layers=parameters_list[0], base_neurons=parameters_list[1], output_dim=1, activation_functions=parameters_list[2], lr=np.exp(parameters_list[3]), alpha=np.exp(parameters_list[4]), epochs=parameters_list[5], optimizer_choice=parameters_list[6], batch_size=parameters_list[7], dropout_rate=parameters_list[8], patience=parameters_list[9])
                 
             elif model_name == "DecisionTreeClassifier":
