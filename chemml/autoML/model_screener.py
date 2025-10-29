@@ -7,13 +7,21 @@ from chemml.utils import regression_metrics
 from sklearn.metrics import accuracy_score, recall_score, f1_score, precision_score
 from sklearn.model_selection import train_test_split, KFold
 from chemml.optimization import GeneticAlgorithm
-from chemml.chem import RDKitFingerprint, Mordred
+from chemml.chem import RDKitFingerprint
 from chemml.chem import Molecule
 import warnings
 import random
 import time
 from importlib import import_module
 import multiprocessing
+from chemml.models import PyTorchRegressorWrapper
+from chemml.models import TensorFlowRegressorWrapper
+import torch
+import tensorflow as tf
+
+
+
+from chemml.datasets import load_organic_density
 
 warnings.filterwarnings("ignore")
 
@@ -22,6 +30,7 @@ warnings.filterwarnings("ignore")
 class ModelScreener(object):
 
 #   from chemml.autoML import ModelScreener
+
 
 #   MS = ModelScreener(df, target="density_Kg/m3", featurization=True, smiles="smiles", 
 #                    screener_type="regressor", output_file="testing.txt")
@@ -54,6 +63,7 @@ class ModelScreener(object):
 
         """        
         
+        
         self.n_gen=n_gen
         
         if isinstance(df, pd.DataFrame):
@@ -74,8 +84,6 @@ class ModelScreener(object):
             raise TypeError("Featurization must be True or False !")
         self.featurization = featurization
         if self.featurization == True:
-            # List to gather locations of invalid SMILES if present and remove them from the targets
-            self.discarded_indices = [] 
             if smiles == None:
                 raise ValueError("If feature screeening is required, smiles column must be provided!")
             else:
@@ -111,12 +119,13 @@ class ModelScreener(object):
             kf = KFold(n_splits)                                                      # cross validation based on Kfold (creates 5 validation train-test sets)
             accuracy_kfold = []
             for train_index, test_index in kf.split(x):
-                x_training, x_testing= x.iloc[train_index], x.iloc[test_index]
-                y_training, y_testing = y.iloc[train_index], y.iloc[test_index]
+                x_training, x_testing= x[train_index], x[test_index]
+                y_training, y_testing = y[train_index], y[test_index]
                 model.fit(x_training, y_training)
-                y_pred = model.predict(x_testing)
+                y_pred = model.predict(x_testing) #####
                 if self.screener_type == "regressor":
-                    score = regression_metrics(y_testing, y_pred)['r_squared'][0]
+                    score = regression_metrics(y_testing, y_pred)['r_squared'][0] #####
+
                 else:
                     score = accuracy_score(y_testing, y_pred)
                 # evaluation metric:  r2_score
@@ -125,12 +134,12 @@ class ModelScreener(object):
         
         def test_hyp(ml_model, x, y, xtest, ytest, key):                                          
             ml_model.fit(x, y)
-            ypred = ml_model.predict(xtest)
+            ypred = ml_model.predict(x) ####
             if self.screener_type == "regressor":            
-                scores = regression_metrics(y_true=y_test, y_predicted=ypred)
+                scores = regression_metrics(y_true=y, y_predicted=ypred) ####
                 time_taken = time.time() - model_start_time
                 scores["time(seconds)"]= time_taken
-                scores["Model"]=model_name
+                scores["Model"]=model_name                
                 scores['parameters']=[ml_model.get_params()]
                 scores['Feature']=key
                 
@@ -155,7 +164,6 @@ class ModelScreener(object):
             return scores
 
         def set_hyper_params(parameters_list, model_name):
-            # print("parameters_list: ", parameters_list)
             from .models_dict import models_dict
             module = import_module(models_dict[model_name])
 
@@ -187,6 +195,12 @@ class ModelScreener(object):
             elif model_name == "LogisticRegression":
                 model = getattr(module,model_name)(C=parameters_list[0], fit_intercept=parameters_list[1], solver=parameters_list[2])
 
+            elif model_name == "PyTorchRegressorWrapper":  
+                model = getattr(module,model_name)(input_dim=self.nfeatures, n_layers=parameters_list[0], base_neurons=parameters_list[1], output_dim=1, activation_functions=parameters_list[2], lr=np.exp(parameters_list[3]), alpha=np.exp(parameters_list[4]), epochs=parameters_list[5], optimizer_choice=parameters_list[6], batch_size=parameters_list[7], dropout_rate=parameters_list[8], patience=parameters_list[9])
+                
+            elif model_name == "TensorFlowRegressorWrapper":
+                model = getattr(module,model_name)(input_dim=self.nfeatures, n_layers=parameters_list[0], base_neurons=parameters_list[1], output_dim=1, activation_functions=parameters_list[2], lr=np.exp(parameters_list[3]), alpha=np.exp(parameters_list[4]), epochs=parameters_list[5], optimizer_choice=parameters_list[6], batch_size=parameters_list[7], dropout_rate=parameters_list[8], patience=parameters_list[9])
+                
             elif model_name == "DecisionTreeClassifier":
                 model = getattr(module,model_name)(criterion=parameters_list[0], splitter=parameters_list[1], min_samples_split=parameters_list[2])
             
@@ -198,7 +212,8 @@ class ModelScreener(object):
             
             elif model_name == "KNeighborsClassifier":
                 model = getattr(module,model_name)(n_neighbors=parameters_list[0], weights=parameters_list[1])
-
+           
+            
             else:
                 raise ValueError("This model cannot be used currently. Please refer to documentation. ")
             
@@ -245,8 +260,7 @@ class ModelScreener(object):
                 ga_progress.write("\n")
 
             scores_list.append(ga(X_train, y_train, X_test, y_test, model_name=model_name, space_final=space_final, al=3))
-            print("scores_list: ", scores_list)
-            print("--------------------------------------------------------------------------------")
+            print("scores_list: ", scores_list)            
             with open(output_file, 'a') as ga_progress:
                 ga_progress.write("\nPerforming GA on next model \n")
         except Exception as e: 
@@ -255,7 +269,7 @@ class ModelScreener(object):
             # print(e)
             print("\n")
         
-        return scores_list
+        return list(scores_list)
 
     def _represent_smiles(self):
         """
@@ -272,8 +286,6 @@ class ModelScreener(object):
         # generate all representation techniques here
 
         mol_objs_list=[]
-        
-        i=0
         for smi in self.smiles:
             mol = Molecule(smi, 'smiles')
             mol.hydrogens('add')
@@ -282,8 +294,6 @@ class ModelScreener(object):
                 mol_objs_list.append(mol)
             except Exception as e:
                 print("Unable to process smile: ", smi)
-                self.discarded_indices.append(i)
-            i+=1
                 
         #The coulomb matrix type can be sorted (SC), unsorted(UM), unsorted triangular(UT), eigen spectrum(E), or random (RC)
         CM = CoulombMatrix(cm_type='SC',n_jobs=-1)
@@ -345,14 +355,7 @@ class ModelScreener(object):
         scaled_allDescrs = scaler.fit_transform(allDescrs)
         scaled_allDescrs = pd.DataFrame(scaled_allDescrs)
         self.x_list["rdkit_descriptors"] = scaled_allDescrs
-
-        mord = Mordred()
-        mord_descriptors = mord.represent(mol_objs_list, remove_corr=True).drop(columns='SMILES')
-        mord_scaler = StandardScaler()
-        mord_descriptors = pd.DataFrame(mord_scaler.fit_transform(mord_descriptors))
-        self.x_list['mord_descriptors'] = mord_descriptors
-
-
+        
     def aggregate_scores(self,  scores_list, n_best):
         """ 
         This function aggregates a list of scores, combines them into a pandas dataframe, sorts them by
@@ -413,7 +416,6 @@ class ModelScreener(object):
 
         if self.featurization == True:
             self._represent_smiles()
-            y = y.drop(index=self.discarded_indices)
             
         scores_list=[]
 
@@ -421,9 +423,12 @@ class ModelScreener(object):
             start_time = time.time()
             scores_df = pd.DataFrame()
 
-            X_train, X_test, y_train, y_test = train_test_split(self.x_list[key], y, test_size=0.1, random_state=42)
+            X_train, X_test, y_train, y_test = train_test_split(self.x_list[key].values, y.values, test_size=0.1, random_state=42)
             print("split done!")
-            tmp_counter = 0         
+            tmp_counter = 0  
+            self.nfeatures = X_train.shape[1]
+            
+            #self.engine = engine       
 
             if self.screener_type == "classifier":
                 from .space import space_models_classifiers
@@ -458,11 +463,17 @@ class ModelScreener(object):
             scores_list_final =[]
             for result in results:
                 for result_df in result.get():
-                    scores_list_final.append(result_df)
-
+                    result_data = list(result.get())  
+                    scores_list_final.extend(result_data) 
+                   
             print("\n--- %s seconds ---" % (time.time() - start_time))
 
         # aggregate scores list
         best_models = self.aggregate_scores(scores_list=scores_list_final, n_best=n_best)
 
         return best_models
+
+
+
+
+
