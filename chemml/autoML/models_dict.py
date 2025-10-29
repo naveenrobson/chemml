@@ -16,5 +16,8 @@ models_dict = {
     "KNeighborsClassifier": "sklearn.neighbors",
     "LGBMClassifier": "lightgbm",
     # "XGBClassifier": "xgboost",
+    "PyTorchRegressorWrapper": "chemml.models",
+    "TensorFlowRegressorWrapper": "chemml.models",
+      
         
 }
