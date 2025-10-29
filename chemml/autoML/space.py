@@ -67,6 +67,34 @@ space_models = {
                 #                 {'reg_lambda': {'uniform': [np.log(0.0001), np.log(0.1)],                
                 #                 'mutation': [0, 1]}},
                 # ]
+
+                'PyTorchRegressorWrapper':[                   
+                       {'n_layers': {'choice': [3, 4, 5]}}, 
+                       {'base_neurons': {'choice': [64, 128, 256]}},                          
+                       {'activations': {'n_choices': get_n_activations, 'choice': ['swish', 'gelu', 'leakyrelu']}},
+                       {'lr': {'uniform': [np.log(0.0001), np.log(0.1)], 'mutation': [0,1]}},
+                       {'alpha': {'uniform': [np.log(0.0001), np.log(0.1)], 'mutation': [0,1]}},                       
+                       {'epochs': {'choice': range(100, 301, 100), 'mutation': [50, 25]}},                       
+                       {'optimizer_choice': {'choice':['AdamW','Adam']}},
+                       {'batch_size': {'choice': [25, 50, 100], 'mutation': [25, 50]}},
+                       {'dropout_rate': {'uniform': [0.2, 0.4], 'mutation': [0.1, 0.05]}},
+                       {'patience': {'choice': [20, 25]}},
+                       
+                ],       
+               
+                'TensorFlowRegressorWrapper':[                   
+                       {'n_layers': {'choice': [3, 4, 5]}}, 
+                       {'base_neurons': {'choice': [64, 128, 256]}},                          
+                       {'activations': {'n_choices': get_n_activations, 'choice': ['swish', 'gelu', 'leakyrelu']}},
+                       {'lr': {'uniform': [np.log(0.0001), np.log(0.1)], 'mutation': [0,1]}},
+                       {'alpha': {'uniform': [np.log(0.00000001), np.log(0.001)], 'mutation': [0,1]}},                       
+                       {'epochs': {'choice': range(100, 301, 100), 'mutation': [50, 25]}},                  
+                       {'optimizer_choice': {'choice':['AdamW','Adam']}},
+                       {'batch_size': {'choice': [32, 64, 128]}},
+                       {'dropout_rate': {'uniform': [0.1, 0.5], 'mutation': [0.1, 0.05]}},
+                       {'patience': {'choice': [10, 15]}},
+                       
+                ],        
                 }
 
 '''
